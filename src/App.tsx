@@ -32,6 +32,36 @@ export default function App() {
   const [model, setModel] = useState<string>(MODELS["google"][0]);
   const [language, setLanguage] = useState<Language>("English");
 
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<"idle" | "success" | "error">("idle");
+  const [keyMessage, setKeyMessage] = useState("");
+
+  const handleValidateKey = async () => {
+    setIsValidatingKey(true);
+    setKeyStatus("idle");
+    try {
+      const res = await fetch("/api/validate-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, apiKey, model })
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setKeyStatus("success");
+        setKeyMessage("API Key is valid!");
+        setTimeout(() => setKeyStatus("idle"), 3000);
+      } else {
+        setKeyStatus("error");
+        setKeyMessage(data.error || "Invalid API Key.");
+      }
+    } catch (err: any) {
+      setKeyStatus("error");
+      setKeyMessage(err.message || "Validation failed.");
+    } finally {
+      setIsValidatingKey(false);
+    }
+  };
+
   useEffect(() => {
     setModel(MODELS[provider][0]);
   }, [provider]);
@@ -228,20 +258,47 @@ export default function App() {
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <label className="text-sm font-medium text-neutral-400 block flex items-center justify-between">
                   API Key
                   {provider === "google" && (
                     <span className="text-xs text-orange-400">Optional if set in Env</span>
                   )}
                 </label>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={`Enter ${provider} API Key`}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 text-white"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      setKeyStatus("idle");
+                    }}
+                    placeholder={`Enter ${provider} API Key`}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 text-white"
+                  />
+                  <button
+                    onClick={handleValidateKey}
+                    disabled={isValidatingKey || (!apiKey && provider !== "google")}
+                    className="bg-neutral-800 hover:bg-neutral-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center justify-center min-w-[80px] disabled:opacity-50"
+                  >
+                    {isValidatingKey ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Insert"}
+                  </button>
+                </div>
+                <div className="relative h-4 mt-1">
+                  <AnimatePresence>
+                    {keyStatus !== "idle" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        className={cn("absolute inset-0 text-xs font-medium flex items-center gap-1.5", keyStatus === "success" ? "text-green-400" : "text-red-400")}
+                      >
+                        {keyStatus === "success" ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+                        <span className="truncate">{keyMessage}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
           </motion.div>

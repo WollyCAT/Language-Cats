@@ -91,6 +91,49 @@ If there are no errors, return { "errors": [] }. Ensure originalText matches the
     }
   });
 
+  // API Route for Key Validation
+  app.post("/api/validate-key", async (req, res) => {
+    try {
+      const { provider, model, apiKey } = req.body;
+      let finalApiKey = apiKey;
+      if (!finalApiKey && provider === "google" && process.env.GEMINI_API_KEY) {
+        finalApiKey = process.env.GEMINI_API_KEY;
+      }
+
+      if (!finalApiKey) {
+        return res.status(400).json({ valid: false, error: "API key is required." });
+      }
+
+      if (provider === "google") {
+        const ai = new GoogleGenAI({ apiKey: finalApiKey });
+        await ai.models.generateContent({
+          model: model || "gemini-2.5-flash",
+          contents: "hi",
+          config: { maxOutputTokens: 1 },
+        });
+      } else if (provider === "openai") {
+        const ai = new OpenAI({ apiKey: finalApiKey });
+        await ai.chat.completions.create({
+          model: model || "gpt-4o-mini",
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 1,
+        });
+      } else if (provider === "anthropic") {
+        const ai = new Anthropic({ apiKey: finalApiKey });
+        await ai.messages.create({
+          model: model || "claude-3-haiku-20240307",
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 1,
+        });
+      }
+
+      res.json({ valid: true });
+    } catch (error: any) {
+      console.error(error);
+      res.status(400).json({ valid: false, error: error.message || "Invalid API key." });
+    }
+  });
+
   // API Route for Tone Revision
   app.post("/api/revise-tone", async (req, res) => {
     try {
